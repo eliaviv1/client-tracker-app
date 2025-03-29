@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card.jsx";
-import { Button } from "@/components/ui/button.jsx";
-import { Input } from "@/components/ui/input.jsx";
-import { Textarea } from "@/components/ui/textarea.jsx";
-import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select.jsx";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.jsx";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc } from "firebase/firestore";
@@ -35,6 +35,7 @@ export default function ClientTrackerApp() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [activeProject, setActiveProject] = useState(null);
+  const [sortOrder, setSortOrder] = useState("asc");
 
   const [vatRate, setVatRate] = useState("");
   const [nationalInsuranceRate, setNationalInsuranceRate] = useState("");
@@ -42,6 +43,13 @@ export default function ClientTrackerApp() {
 
   useEffect(() => {
     const fetchData = async () => {
+      const settingsSnapshot = await getDocs(collection(db, "settings"));
+      const settingsData = settingsSnapshot.docs[0]?.data();
+      if (settingsData) {
+        setVatRate(settingsData.vatRate || "");
+        setNationalInsuranceRate(settingsData.nationalInsuranceRate || "");
+        setIncomeTaxRate(settingsData.incomeTaxRate || "");
+      }
       const clientsSnapshot = await getDocs(collection(db, "clients"));
       const projectsSnapshot = await getDocs(collection(db, "projects"));
       setClients(clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -118,7 +126,13 @@ export default function ClientTrackerApp() {
   const clientsInProject = clients.filter((c) => c.project === activeProject);
   const availableClients = clients;
   const currentProject = projects.find((p) => p.name === activeProject);
-  const filteredProjects = filterType === "all" ? projects : projects.filter(p => p.type === filterType);
+  const filteredProjects = (filterType === "all" ? projects : projects.filter(p => p.type === filterType))
+    .slice()
+    .sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+    });
 
   return (
     <Tabs defaultValue="projects" className="p-6 max-w-5xl mx-auto space-y-6">
@@ -149,6 +163,13 @@ export default function ClientTrackerApp() {
                 </SelectContent>
               </Select>
               <Button onClick={addProject}>צור פרויקט חדש</Button>
+              <Select value={sortOrder} onValueChange={(val) => setSortOrder(val)}>
+                <SelectTrigger>מיין לפי תאריך: {sortOrder === "asc" ? "עולה" : "יורד"}</SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">עולה</SelectItem>
+                  <SelectItem value="desc">יורד</SelectItem>
+                </SelectContent>
+              </Select>
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="חפש לפי שם או סטטוס..." />
               <Select value={filterType} onValueChange={(val) => setFilterType(val)}>
                 <SelectTrigger>סנן לפי סוג: {filterType === "all" ? "הכל" : filterType}</SelectTrigger>
@@ -160,16 +181,13 @@ export default function ClientTrackerApp() {
                 </SelectContent>
               </Select>
               {filteredProjects.map((project) => (
-                <div key={project.name} className="border rounded-xl p-4 shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setActiveProject(project.name)}>
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-bold">{project.name}</h3>
-                    {project.client && <p>לקוח: {project.client}</p>}
-                    <p>סכום כולל: ₪{project.budget}</p>
-                    {project.type && <p>סוג הפרויקט: {project.type}</p>}
-                    {project.date && <p>תאריך: {project.date}</p>}
-                    {project.description && <p className="text-sm text-gray-600">{project.description}</p>}
-                    <p>{clients.filter((c) => c.project === project.name).length} הוצאות</p>
-                  </div>
+                <div
+                  key={project.name}
+                  className="flex justify-between items-center border-b py-2 cursor-pointer hover:bg-gray-50"
+                  onClick={() => setActiveProject(project.name)}
+                >
+                  <span className="font-medium">{project.name}</span>
+                  <span className="text-sm text-gray-500">{project.date}</span>
                 </div>
               ))}
             </CardContent>
@@ -268,6 +286,7 @@ export default function ClientTrackerApp() {
                   ))}
               </div>
             )}
+          
           </CardContent>
         </Card>
       </TabsContent>
@@ -279,36 +298,48 @@ export default function ClientTrackerApp() {
       <TabsContent value="settings">
         <Card>
           <CardContent className="pt-6 space-y-4">
-            <h1 className="text-2xl font-bold">הגדרות</h1>
-            <p className="text-gray-600">הזן כאן אחוזים כלליים שישמשו לחישובי הוצאות ודוחות:</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">מע״מ (%)</label>
-                <Input
-                  type="number"
-                  placeholder="למשל: 17"
-                  value={vatRate}
-                  onChange={(e) => setVatRate(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">ביטוח לאומי (%)</label>
-                <Input
-                  type="number"
-                  placeholder="למשל: 3.5"
-                  value={nationalInsuranceRate}
-                  onChange={(e) => setNationalInsuranceRate(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">מס הכנסה (%)</label>
-                <Input
-                  type="number"
-                  placeholder="למשל: 10"
-                  value={incomeTaxRate}
-                  onChange={(e) => setIncomeTaxRate(e.target.value)}
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">מע"מ (%)</label>
+              <Input
+                type="number"
+                placeholder="למשל: 17"
+                value={vatRate}
+                onChange={(e) => setVatRate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">ביטוח לאומי (%)</label>
+              <Input
+                type="number"
+                placeholder="למשל: 3.5"
+                value={nationalInsuranceRate}
+                onChange={(e) => setNationalInsuranceRate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">מס הכנסה (%)</label>
+              <Input
+                type="number"
+                placeholder="למשל: 10"
+                value={incomeTaxRate}
+                onChange={(e) => setIncomeTaxRate(e.target.value)}
+              />
+            </div>
+            <div className="pt-4">
+              <Button onClick={async () => {
+                const settingsSnapshot = await getDocs(collection(db, "settings"));
+                const docId = settingsSnapshot.docs[0]?.id;
+                const settingsRef = docId
+                  ? doc(db, "settings", docId)
+                  : await addDoc(collection(db, "settings"), {});
+                await updateDoc(settingsRef, {
+                  vatRate,
+                  nationalInsuranceRate,
+                  incomeTaxRate
+                });
+              }}>
+                שמור הגדרות
+              </Button>
             </div>
           </CardContent>
         </Card>
