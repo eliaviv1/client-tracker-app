@@ -172,7 +172,15 @@ export default function ClientTrackerApp() {
               <Input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} placeholder="שם פרויקט חדש" />
               <Input value={newProjectBudget} onChange={(e) => setNewProjectBudget(e.target.value)} placeholder="סכום כולל לפרויקט" type="number" />
               <Textarea value={newProjectDescription} onChange={(e) => setNewProjectDescription(e.target.value)} placeholder="תיאור הפרויקט (אופציונלי)" />
-              <Input value={newProjectDate} onChange={(e) => setNewProjectDate(e.target.value)} type="date" placeholder="תאריך הפרויקט" />
+              <div>
+                <label className="block text-sm font-medium mb-1">תאריך הפרויקט</label>
+                <Input 
+                  value={newProjectDate} 
+                  onChange={(e) => setNewProjectDate(e.target.value)} 
+                  type="date" 
+                  placeholder="תאריך הפרויקט" 
+                />
+              </div>
               <Input value={newProjectClient} onChange={(e) => setNewProjectClient(e.target.value)} placeholder="שם הלקוח" />
               <Select value={newProjectType} onValueChange={(val) => setNewProjectType(val)}>
                 <SelectTrigger>סוג הפרויקט: {newProjectType}</SelectTrigger>
