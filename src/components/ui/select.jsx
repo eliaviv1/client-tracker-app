@@ -1,10 +1,10 @@
-export function Select({ value, onChange, children, className = "" }) {
+export function Select({ value, onValueChange, children, className = "" }) {
   return (
     <select
       value={value}
       onChange={(e) => {
         console.log("Selected value: ", e.target.value);
-        onChange(e.target.value);
+        onValueChange(e.target.value);
       }}
       className={`border border-gray-300 rounded px-3 py-2 w-full ${className}`}
     >
