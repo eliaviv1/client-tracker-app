@@ -40,6 +40,7 @@ export default function ClientTrackerApp() {
   const [vatRate, setVatRate] = useState("");
   const [nationalInsuranceRate, setNationalInsuranceRate] = useState("");
   const [incomeTaxRate, setIncomeTaxRate] = useState("");
+  const [isVatIncluded, setIsVatIncluded] = useState("לא כולל מע\"מ");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -110,7 +111,8 @@ export default function ClientTrackerApp() {
         description: newProjectDescription,
         date: newProjectDate,
         type: newProjectType,
-        client: newProjectClient
+        client: newProjectClient,
+        vatIncluded: isVatIncluded, // שמירת הבחירה
       };
       await addDoc(collection(db, "projects"), newProj);
       setProjects([...projects, newProj]);
@@ -121,6 +123,24 @@ export default function ClientTrackerApp() {
     setNewProjectDate("");
     setNewProjectType("חתונה");
     setNewProjectClient("");
+    setIsVatIncluded("לא כולל מע\"מ"); // איפוס הבחירה
+  };
+
+  const deleteProject = async (projectName) => {
+    const projectDoc = projects.find((p) => p.name === projectName);
+    if (!projectDoc) return;
+  
+    const projectRef = collection(db, "projects");
+    const snapshot = await getDocs(projectRef);
+    const docToDelete = snapshot.docs.find((doc) => doc.data().name === projectName);
+  
+    if (docToDelete) {
+      await deleteDoc(doc(db, "projects", docToDelete.id));
+      setProjects(projects.filter((p) => p.name !== projectName));
+      if (activeProject === projectName) {
+        setActiveProject(null);
+      }
+    }
   };
 
   const clientsInProject = clients.filter((c) => c.project === activeProject);
@@ -162,6 +182,13 @@ export default function ClientTrackerApp() {
                   <SelectItem value="אחר">אחר</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={isVatIncluded} onValueChange={(val) => setIsVatIncluded(val)}>
+    <SelectTrigger>מע"מ: {isVatIncluded}</SelectTrigger>
+    <SelectContent>
+      <SelectItem value="כולל מע&quot;מ">כולל מע"מ</SelectItem>
+      <SelectItem value="לא כולל מע&quot;מ">לא כולל מע"מ</SelectItem>
+    </SelectContent>
+    </Select>
               <Button onClick={addProject}>צור פרויקט חדש</Button>
               <Select value={sortOrder} onValueChange={(val) => setSortOrder(val)}>
                 <SelectTrigger>מיין לפי תאריך: {sortOrder === "asc" ? "עולה" : "יורד"}</SelectTrigger>
@@ -184,10 +211,23 @@ export default function ClientTrackerApp() {
                 <div
                   key={project.name}
                   className="flex justify-between items-center border-b py-2 cursor-pointer hover:bg-gray-50"
-                  onClick={() => setActiveProject(project.name)}
                 >
-                  <span className="font-medium">{project.name}</span>
-                  <span className="text-sm text-gray-500">{project.date}</span>
+                  <span
+                    className="font-medium"
+                    onClick={() => setActiveProject(project.name)}
+                  >
+                    {project.name}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">{project.date}</span>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => deleteProject(project.name)}
+                    >
+                      מחק
+                    </Button>
+                  </div>
                 </div>
               ))}
             </CardContent>
@@ -324,22 +364,36 @@ export default function ClientTrackerApp() {
                 value={incomeTaxRate}
                 onChange={(e) => setIncomeTaxRate(e.target.value)}
               />
-            </div>
+      <Select value={isVatIncluded} onValueChange={(val) => setIsVatIncluded(val)}>
+              <SelectTrigger>מע"מ: {isVatIncluded}</SelectTrigger>
+              <SelectContent>
+                <SelectItem value="כולל מע&quot;מ">כולל מע"מ</SelectItem>
+                <SelectItem value="לא כולל מע&quot;מ">לא כולל מע"מ</SelectItem>
+              </SelectContent>
+            </Select>
+      </div>
+            <Select value={isVatIncluded} onValueChange={(val) => setIsVatIncluded(val)}>
+              <SelectTrigger>מע"מ: {isVatIncluded}</SelectTrigger>
+              <SelectContent>
+                <SelectItem value="כולל מע&quot;מ">כולל מע"מ</SelectItem>
+                <SelectItem value="לא כולל מע&quot;מ">לא כולל מע"מ</SelectItem>
+              </SelectContent>
+            </Select>
             <div className="pt-4">
-              <Button onClick={async () => {
-                const settingsSnapshot = await getDocs(collection(db, "settings"));
-                const docId = settingsSnapshot.docs[0]?.id;
-                const settingsRef = docId
-                  ? doc(db, "settings", docId)
-                  : await addDoc(collection(db, "settings"), {});
-                await updateDoc(settingsRef, {
-                  vatRate,
-                  nationalInsuranceRate,
-                  incomeTaxRate
-                });
-              }}>
-                שמור הגדרות
-              </Button>
+             <Button onClick={async () => {
+  const settingsSnapshot = await getDocs(collection(db, "settings"));
+  const docId = settingsSnapshot.docs[0]?.id;
+  const settingsRef = docId
+    ? doc(db, "settings", docId)
+    : await addDoc(collection(db, "settings"), {});
+  await updateDoc(settingsRef, {
+    vatRate,
+    nationalInsuranceRate,
+    incomeTaxRate,
+  });
+}}>
+  שמור הגדרות
+</Button>
             </div>
           </CardContent>
         </Card>
