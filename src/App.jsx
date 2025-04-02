@@ -29,7 +29,7 @@ export default function ClientTrackerApp() {
   const [newProjectBudget, setNewProjectBudget] = useState("");
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [newProjectDate, setNewProjectDate] = useState("");
-  const [newProjectType, setNewProjectType] = useState("חתונה");
+  const [newProjectType, setNewProjectType] = useState("הפקה");
   const [newProjectClient, setNewProjectClient] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState("");
@@ -41,6 +41,20 @@ export default function ClientTrackerApp() {
   const [nationalInsuranceRate, setNationalInsuranceRate] = useState("");
   const [incomeTaxRate, setIncomeTaxRate] = useState("");
   const [isVatIncluded, setIsVatIncluded] = useState("לא כולל מע\"מ");
+  const calculateVAT = (amount) => {
+    if (!amount || isNaN(amount) || !vatRate || isNaN(vatRate)) {
+      return 0; // אם אין סכום או מע"מ תקין, החזר 0
+    }
+  
+    if (isVatIncluded === "כולל מע\"מ") {
+      // חישוב המע"מ מתוך הסכום הכולל
+      const vatMultiplier = 1 + parseFloat(vatRate) / 100;
+      return (parseFloat(amount) - parseFloat(amount) / vatMultiplier).toFixed(2);
+    }
+  
+    // חישוב מע"מ רגיל (כאשר לא כולל מע"מ)
+    return ((parseFloat(amount) * parseFloat(vatRate)) / 100).toFixed(2);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -104,29 +118,50 @@ export default function ClientTrackerApp() {
 
   const addProject = async () => {
     if (!newProjectName.trim()) return;
-    if (!projects.find((p) => p.name === newProjectName)) {
-      const newProj = {
-        name: newProjectName,
-        budget: newProjectBudget,
-        description: newProjectDescription,
-        date: newProjectDate,
-        type: newProjectType,
-        client: newProjectClient,
-        vatIncluded: isVatIncluded, // שמירת הבחירה
-      };
-      await addDoc(collection(db, "projects"), newProj);
-      setProjects([...projects, newProj]);
+
+    const updatedProject = {
+      name: newProjectName,
+      budget: newProjectBudget,
+      description: newProjectDescription,
+      date: newProjectDate,
+      type: newProjectType,
+      client: newProjectClient,
+      vatIncluded: isVatIncluded,
+    };
+
+    if (editingId) {
+      // עדכון פרויקט קיים
+      const projectRef = collection(db, "projects");
+      const snapshot = await getDocs(projectRef);
+      const docToUpdate = snapshot.docs.find((doc) => doc.data().name === editingId);
+
+      if (docToUpdate) {
+        await updateDoc(doc(db, "projects", docToUpdate.id), updatedProject);
+        setProjects(projects.map((p) => (p.name === editingId ? updatedProject : p)));
+      }
+      setEditingId(null); // איפוס מצב העריכה
+    } else {
+      // יצירת פרויקט חדש
+      if (!projects.find((p) => p.name === newProjectName)) {
+        const docRef = await addDoc(collection(db, "projects"), updatedProject);
+        setProjects([...projects, { ...updatedProject, id: docRef.id }]);
+      }
     }
+
+    // איפוס הטופס
     setNewProjectName("");
     setNewProjectBudget("");
     setNewProjectDescription("");
     setNewProjectDate("");
-    setNewProjectType("חתונה");
+    setNewProjectType("הפקה");
     setNewProjectClient("");
-    setIsVatIncluded("לא כולל מע\"מ"); // איפוס הבחירה
+    setIsVatIncluded("לא כולל מע\"מ");
   };
 
   const deleteProject = async (projectName) => {
+    const confirmDelete = window.confirm(`האם אתה בטוח שברצונך למחוק את הפרויקט "${projectName}"?`);
+    if (!confirmDelete) return;
+  
     const projectDoc = projects.find((p) => p.name === projectName);
     if (!projectDoc) return;
   
@@ -141,6 +176,29 @@ export default function ClientTrackerApp() {
         setActiveProject(null);
       }
     }
+  };
+
+  const editProject = (project) => {
+    setNewProjectName(project.name);
+    setNewProjectBudget(project.budget);
+    setNewProjectDescription(project.description);
+    setNewProjectDate(project.date);
+    setNewProjectType(project.type);
+    setNewProjectClient(project.client);
+    setIsVatIncluded(project.vatIncluded || "לא כולל מע\"מ");
+    setEditingId(project.name); // נשתמש בשם הפרויקט כ-ID לעריכה
+    setActiveProject(null); // חזרה לטופס יצירת פרויקט
+  };
+
+  const cancelEdit = () => {
+    setNewProjectName("");
+    setNewProjectBudget("");
+    setNewProjectDescription("");
+    setNewProjectDate("");
+    setNewProjectType("הפקה");
+    setNewProjectClient("");
+    setIsVatIncluded("לא כולל מע\"מ");
+    setEditingId(null); // איפוס מצב העריכה
   };
 
   const clientsInProject = clients.filter((c) => c.project === activeProject);
@@ -170,8 +228,26 @@ export default function ClientTrackerApp() {
             <CardContent className="pt-6 space-y-4">
               <h2 className="text-xl font-semibold">פרויקטים</h2>
               <Input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} placeholder="שם פרויקט חדש" />
-              <Input value={newProjectBudget} onChange={(e) => setNewProjectBudget(e.target.value)} placeholder="סכום כולל לפרויקט" type="number" />
               <Textarea value={newProjectDescription} onChange={(e) => setNewProjectDescription(e.target.value)} placeholder="תיאור הפרויקט (אופציונלי)" />
+
+              <Input value={newProjectBudget} onChange={(e) => setNewProjectBudget(e.target.value)} placeholder="סכום כולל לפרויקט" type="number" />
+              <Select value={isVatIncluded} onValueChange={(val) => setIsVatIncluded(val)}>
+    <SelectTrigger>מע"מ: {isVatIncluded}</SelectTrigger>
+    <SelectContent>
+      <SelectItem value="כולל מע&quot;מ">כולל מע"מ</SelectItem>
+      <SelectItem value="לא כולל מע&quot;מ">לא כולל מע"מ</SelectItem>
+    </SelectContent>
+    </Select>
+              <div>
+  <label className="block text-sm font-medium mb-1">מע"מ (₪)</label>
+  <Input
+    type="text"
+    value={newProjectBudget ? calculateVAT(newProjectBudget) : ""}
+    readOnly
+    placeholder="מעמ יחושב אוטומטית"
+    className="bg-gray-100 cursor-not-allowed"
+  />
+</div>
               <div>
                 <label className="block text-sm font-medium mb-1">תאריך הפרויקט</label>
                 <Input 
@@ -185,19 +261,21 @@ export default function ClientTrackerApp() {
               <Select value={newProjectType} onValueChange={(val) => setNewProjectType(val)}>
                 <SelectTrigger>סוג הפרויקט: {newProjectType}</SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="חתונה">חתונה</SelectItem>
-                  <SelectItem value="הפקה">הפקה</SelectItem>
+                <SelectItem value="הפקה">הפקה</SelectItem>
+                <SelectItem value="חתונה">חתונה</SelectItem>
                   <SelectItem value="אחר">אחר</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={isVatIncluded} onValueChange={(val) => setIsVatIncluded(val)}>
-    <SelectTrigger>מע"מ: {isVatIncluded}</SelectTrigger>
-    <SelectContent>
-      <SelectItem value="כולל מע&quot;מ">כולל מע"מ</SelectItem>
-      <SelectItem value="לא כולל מע&quot;מ">לא כולל מע"מ</SelectItem>
-    </SelectContent>
-    </Select>
-              <Button onClick={addProject}>צור פרויקט חדש</Button>
+              <div className="flex gap-2">
+  <Button onClick={addProject}>
+    {editingId ? "שמור שינויים" : "צור פרויקט חדש"}
+  </Button>
+  {editingId && (
+    <Button variant="outline" onClick={cancelEdit}>
+      ביטול
+    </Button>
+  )}
+</div>
               <Select value={sortOrder} onValueChange={(val) => setSortOrder(val)}>
                 <SelectTrigger>מיין לפי תאריך: {sortOrder === "asc" ? "עולה" : "יורד"}</SelectTrigger>
                 <SelectContent>
@@ -229,6 +307,13 @@ export default function ClientTrackerApp() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-500">{project.date}</span>
                     <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => editProject(project)}
+                    >
+                      ערוך
+                    </Button>
+                    <Button
                       variant="destructive"
                       size="sm"
                       onClick={() => deleteProject(project.name)}
@@ -246,13 +331,17 @@ export default function ClientTrackerApp() {
           <Card>
             <CardContent className="pt-6 space-y-4">
               <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-xl font-semibold">פרויקט: {activeProject}</h2>
-                  {currentProject?.client && <p className="text-sm text-gray-500 mt-1">לקוח: {currentProject.client}</p>}
-                  {currentProject?.type && <p className="text-sm text-gray-500 mt-1">סוג הפרויקט: {currentProject.type}</p>}
-                </div>
-                <Button variant="outline" onClick={() => setActiveProject(null)}>חזרה לכל הפרויקטים</Button>
-              </div>
+  <div>
+    <h2 className="text-xl font-semibold">פרויקט: {activeProject}</h2>
+    {currentProject?.client && <p className="text-sm text-gray-500 mt-1">לקוח: {currentProject.client}</p>}
+    {currentProject?.type && <p className="text-sm text-gray-500 mt-1">סוג הפרויקט: {currentProject.type}</p>}
+  </div>
+  <div className="flex gap-2">
+    <Button variant="outline" onClick={() => setActiveProject(null)}>חזרה לכל הפרויקטים</Button>
+    <Button variant="outline" onClick={() => editProject(currentProject)}>
+  ערוך
+</Button>  </div>
+</div>
               <div className="text-sm text-gray-600 space-y-1">
                 <p>סכום כולל לפרויקט: ₪{currentProject.budget}</p>
                 <p>סה"כ הוצאות: ₪{clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)}</p>
@@ -372,21 +461,9 @@ export default function ClientTrackerApp() {
                 value={incomeTaxRate}
                 onChange={(e) => setIncomeTaxRate(e.target.value)}
               />
-      <Select value={isVatIncluded} onValueChange={(val) => setIsVatIncluded(val)}>
-              <SelectTrigger>מע"מ: {isVatIncluded}</SelectTrigger>
-              <SelectContent>
-                <SelectItem value="כולל מע&quot;מ">כולל מע"מ</SelectItem>
-                <SelectItem value="לא כולל מע&quot;מ">לא כולל מע"מ</SelectItem>
-              </SelectContent>
-            </Select>
+     
       </div>
-            <Select value={isVatIncluded} onValueChange={(val) => setIsVatIncluded(val)}>
-              <SelectTrigger>מע"מ: {isVatIncluded}</SelectTrigger>
-              <SelectContent>
-                <SelectItem value="כולל מע&quot;מ">כולל מע"מ</SelectItem>
-                <SelectItem value="לא כולל מע&quot;מ">לא כולל מע"מ</SelectItem>
-              </SelectContent>
-            </Select>
+
             <div className="pt-4">
              <Button onClick={async () => {
   const settingsSnapshot = await getDocs(collection(db, "settings"));
