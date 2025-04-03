@@ -215,6 +215,11 @@ export default function ClientTrackerApp() {
     setEditingId(null); // איפוס מצב העריכה
   };
 
+  const setActiveProjectAndScroll = (projectName) => {
+    setActiveProject(projectName);
+    window.scrollTo({ top: 0, behavior: "smooth" }); // גלילה לראש הדף עם אנימציה חלקה
+  };
+
   const clientsInProject = clients.filter((c) => c.project === activeProject);
   const availableClients = clients;
   const currentProject = projects.find((p) => p.name === activeProject);
@@ -330,7 +335,7 @@ export default function ClientTrackerApp() {
   >
     <span
       className="font-medium"
-      onClick={() => setActiveProject(project.name)}
+      onClick={() => setActiveProjectAndScroll(project.name)}
     >
       {project.name}
     </span>
