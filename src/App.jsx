@@ -23,7 +23,7 @@ const db = getFirestore(app);
 export default function ClientTrackerApp() {
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [form, setForm] = useState({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "" });
+  const [form, setForm] = useState({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "", isCash: false });
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectBudget, setNewProjectBudget] = useState("");
   const [newProjectDescription, setNewProjectDescription] = useState("");
@@ -55,7 +55,26 @@ export default function ClientTrackerApp() {
     return ((parseFloat(amount) * parseFloat(vatRate)) / 100).toFixed(2);
   };
 
-  useEffect(() => {
+  const calculateNetAmount = (amount) => {
+    if (!amount || isNaN(amount)) return 0;
+  
+    // המרת הסכום למספר
+    const parsedAmount = parseFloat(amount);
+  
+    // חישוב ביטוח לאומי
+    const nationalInsurance = (parsedAmount * parseFloat(nationalInsuranceRate || 0)) / 100;
+  
+    // חישוב הסכום לאחר ניכוי ביטוח לאומי
+    const afterNationalInsurance = parsedAmount - nationalInsurance;
+  
+    // חישוב מס הכנסה על הסכום לאחר ניכוי ביטוח לאומי
+    const incomeTax = (afterNationalInsurance * parseFloat(incomeTaxRate || 0)) / 100;
+  
+    // חישוב הסכום לאחר ניכוי מס הכנסה
+    const netAmount = afterNationalInsurance - incomeTax;
+  
+    return netAmount.toFixed(2); // החזרת התוצאה עם 2 ספרות אחרי הנקודה
+  };  useEffect(() => {
     const fetchData = async () => {
       const settingsSnapshot = await getDocs(collection(db, "settings"));
       const settingsData = settingsSnapshot.docs[0]?.data();
@@ -91,7 +110,7 @@ export default function ClientTrackerApp() {
       const docRef = await addDoc(collection(db, "clients"), clientData);
       setClients([...clients, { ...clientData, id: docRef.id }]);
     }
-    setForm({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "" });
+    setForm({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "", isCash: false });
   };
 
   const editClient = (client) => {
@@ -101,7 +120,8 @@ export default function ClientTrackerApp() {
       amount: client.amount,
       status: client.status,
       notes: client.notes,
-      date: client.date || ""
+      date: client.date || "",
+      isCash: client.isCash || false
     });
     setEditingId(client.id);
   };
@@ -120,7 +140,7 @@ export default function ClientTrackerApp() {
       // איפוס מצב העריכה אם הלקוח שנמחק היה בעריכה
       if (editingId === id) {
         setEditingId(null);
-        setForm({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "" });
+        setForm({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "", isCash: false });
       }
   
       alert("ההוצאה נמחקה בהצלחה!");
@@ -483,23 +503,51 @@ export default function ClientTrackerApp() {
                 </Select>
                 <Input name="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} type="date" placeholder="תאריך העבודה" />
                 <Textarea name="notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="הערות נוספות" className="md:col-span-2" />
+                <div className="flex items-center gap-2">
+  <input
+    type="checkbox"
+    id="isCash"
+    checked={form.isCash}
+    onChange={(e) => setForm({ ...form, isCash: e.target.checked })}
+  />
+  <label htmlFor="isCash" className="text-sm font-medium">
+    מזומן
+  </label>
+</div>
               </div>
               <Button onClick={addClientToProject}>{editingId ? "שמור שינויים" : "הוסף הוצאה לפרויקט"}</Button>
               {clientsInProject.map((client) => (
-                <div key={client.id} className="grid grid-cols-1 md:grid-cols-6 gap-4 border rounded-xl p-4 shadow-sm items-center">
-                  <div className="font-semibold">{client.name}</div>
-                  <div>₪{client.amount}</div>
-                  <div>{client.status}</div>
-                  <div>{client.date}</div>
-                  <div className="text-sm text-gray-600 col-span-1 md:col-span-1">{client.notes}</div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="w-24 sm:w-32 md:w-40 lg:w-48 h-8 sm:h-10 md:h-12 lg:h-14 text-xs sm:text-sm md:text-base lg:text-lg flex items-center justify-center"
- onClick={() => editClient(client)}>ערוך</Button>
-                    <Button variant="destructive"     className="w-24 sm:w-32 md:w-40 lg:w-48 h-8 sm:h-10 md:h-12 lg:h-14 text-xs sm:text-sm md:text-base lg:text-lg flex items-center justify-center"
- onClick={() => deleteClient(client.id)}>מחק</Button>
-                  </div>
-                </div>
-              ))}
+  <div key={client.id} className="grid grid-cols-1 md:grid-cols-6 gap-4 border rounded-xl p-4 shadow-sm items-center">
+    <div className="font-semibold">{client.name}</div>
+    <div>
+      ₪{client.amount}
+      {client.isCash && (
+        <span className="text-sm text-gray-500 ml-2">
+          (לאחר מיסים: ₪{calculateNetAmount(client.amount)})
+        </span>
+      )}
+    </div>
+    <div>{client.status}</div>
+    <div>{client.date}</div>
+    <div className="text-sm text-gray-600 col-span-1 md:col-span-1">{client.notes}</div>
+    <div className="flex gap-2">
+      <Button
+        variant="outline"
+        className="w-24 sm:w-32 md:w-40 lg:w-48 h-8 sm:h-10 md:h-12 lg:h-14 text-xs sm:text-sm md:text-base lg:text-lg flex items-center justify-center"
+        onClick={() => editClient(client)}
+      >
+        ערוך
+      </Button>
+      <Button
+        variant="destructive"
+        className="w-24 sm:w-32 md:w-40 lg:w-48 h-8 sm:h-10 md:h-12 lg:h-14 text-xs sm:text-sm md:text-base lg:text-lg flex items-center justify-center"
+        onClick={() => deleteClient(client.id)}
+      >
+        מחק
+      </Button>
+    </div>
+  </div>
+))}
               {clientsInProject.length === 0 && <p>אין הוצאות בפרויקט זה.</p>}
             </CardContent>
           </Card>
