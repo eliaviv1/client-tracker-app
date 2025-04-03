@@ -5,10 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc } from "firebase/firestore";
-
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"; // מחק ייבוא כפול
 const firebaseConfig = {
   apiKey: "AIzaSyDmGw1G1Ub2LDGmugfrA3WitymIjbeamOc",
   authDomain: "clients-74af1.firebaseapp.com",
@@ -212,6 +211,20 @@ export default function ClientTrackerApp() {
       return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
     });
 
+  const projectData = projects.map((project) => {
+    const totalExpenses = clients
+      .filter((client) => client.project === project.name)
+      .reduce((acc, client) => acc + parseFloat(client.amount || 0), 0);
+  
+    const percentageUsed = ((totalExpenses / parseFloat(project.budget || 1)) * 100).toFixed(2);
+  
+    return {
+      name: project.name,
+      expenses: totalExpenses,
+      percentage: parseFloat(percentageUsed),
+    };
+  });
+
   return (
     <Tabs defaultValue="projects" className="p-6 max-w-5xl mx-auto space-y-6">
       <TabsList>
@@ -332,17 +345,17 @@ export default function ClientTrackerApp() {
             <CardContent className="pt-6 space-y-4">
               <div className="flex justify-between items-center">
   <div>
-    <h2 className="text-xl font-semibold">פרויקט: {activeProject}</h2>
-    {currentProject?.client && <p className="text-sm text-gray-500 mt-1">לקוח: {currentProject.client}</p>}
-    {currentProject?.type && <p className="text-sm text-gray-500 mt-1">סוג הפרויקט: {currentProject.type}</p>}
+    <h2 className="text-xl font-semibold">שם הפרויקט: {activeProject}</h2>
+    {currentProject?.client && <p className="text-m text-gray-500 mt-1">לקוח: {currentProject.client}</p>}
+    {currentProject?.type && <p className="text-l text-gray-800 mt-1">סוג הפרויקט: {currentProject.type}</p>}
+
+
   </div>
-  <div className="flex gap-2">
+  <div className="flex flex-col gap-2">
     <Button variant="outline" onClick={() => setActiveProject(null)}>חזרה לכל הפרויקטים</Button>
-    <Button variant="outline" onClick={() => editProject(currentProject)}>
-  ערוך
-</Button>  </div>
+    <Button variant="outline" onClick={() => editProject(currentProject)}>ערוך</Button>  </div>
 </div>
-              <div className="text-sm text-gray-600 space-y-1">
+              <div className="text-m text-gray-600 space-y-1">
                 <p>סכום כולל לפרויקט: ₪{currentProject.budget}</p>
                 <p>סה"כ הוצאות: ₪{clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)}</p>
                 <p className={`font-semibold ${parseFloat(currentProject.budget || 0) - clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) < 0 ? 'text-red-600' : 'text-green-600'}`}>
@@ -350,6 +363,45 @@ export default function ClientTrackerApp() {
                   {(100 * clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) / parseFloat(currentProject.budget || 1)).toFixed(0)}% נוצל)
                 </p>
               </div>
+{/* גרף הוצאות מתוך ההכנסות */}
+<div className="flex flex-col">
+  <ResponsiveContainer width="100%" height={100}>
+    <BarChart
+          layout="vertical" // שינוי הפריסה לאופקית
+      data={[
+        {
+          name: currentProject.name,
+          income: parseFloat(currentProject.budget || 0),
+          expenses: clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0),
+          remaining: Math.max(
+            parseFloat(currentProject.budget || 0) -
+              clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0),
+            0
+          ), // יתרה
+        },
+      ]}
+    >
+      <XAxis type="number" /> {/* ציר הערכים */}
+      <YAxis type="category" dataKey="" /> {/* ציר הקטגוריות */}
+      <Tooltip />
+      <Bar
+        dataKey="expenses"
+        stackId="a"
+        fill="#ff4d4f" // צבע אדום להוצאות
+        name="הוצאות"
+        label={{ position: "inside", formatter: (value) => `₪${value}` }}
+      />
+      <Bar
+        dataKey="remaining"
+        stackId="a"
+        fill="#82ca9d" // צבע ירוק ליתרה
+        name="יתרה"
+        label={{ position: "inside", formatter: (value) => `₪${value}` }}
+      />
+    </BarChart>
+  </ResponsiveContainer>
+</div>             
+ {/* טופס הוספת הוצאות */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select value={form.clientId} onValueChange={(val) => setForm({ ...form, clientId: val, clientName: "" })}>
                   <SelectTrigger>{form.clientId ? clients.find(c => c.id === form.clientId)?.name : "בחר הוצאה קיימת"}</SelectTrigger>
