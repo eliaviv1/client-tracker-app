@@ -107,11 +107,26 @@ export default function ClientTrackerApp() {
   };
 
   const deleteClient = async (id) => {
-    await deleteDoc(doc(db, "clients", id.toString()));
-    setClients(clients.filter((c) => c.id !== id));
-    if (editingId === id) {
-      setEditingId(null);
-      setForm({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "" });
+    try {
+      console.log("Attempting to delete client with ID:", id); // הדפסת ה-ID לקונסול
+
+      // מחיקת המסמך מהבסיס נתונים
+      const clientRef = doc(db, "clients", id.toString());
+      await deleteDoc(clientRef);
+  
+      // עדכון הלקוחות ב-state המקומי
+      setClients(clients.filter((c) => c.id !== id));
+  
+      // איפוס מצב העריכה אם הלקוח שנמחק היה בעריכה
+      if (editingId === id) {
+        setEditingId(null);
+        setForm({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "" });
+      }
+  
+      alert("ההוצאה נמחקה בהצלחה!");
+    } catch (error) {
+      console.error("Error deleting client:", error.message);
+      alert("אירעה שגיאה בעת מחיקת ההוצאה. נסה שוב.");
     }
   };
 
