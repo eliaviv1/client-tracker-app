@@ -225,6 +225,8 @@ export default function ClientTrackerApp() {
     };
   });
 
+  const [openMenuIndex, setOpenMenuIndex] = useState(null); // State לשליטה בתפריט לפי אינדקס
+
   return (
     <Tabs defaultValue="projects" className="p-6 max-w-5xl mx-auto space-y-6">
       <TabsList>
@@ -306,36 +308,61 @@ export default function ClientTrackerApp() {
                   <SelectItem value="אחר">אחר</SelectItem>
                 </SelectContent>
               </Select>
-              {filteredProjects.map((project) => (
-                <div
-                  key={project.name}
-                  className="flex justify-between items-center border-b py-2 cursor-pointer hover:bg-gray-50"
-                >
-                  <span
-                    className="font-medium"
-                    onClick={() => setActiveProject(project.name)}
-                  >
-                    {project.name}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500">{project.date}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => editProject(project)}
-                    >
-                      ערוך
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deleteProject(project.name)}
-                    >
-                      מחק
-                    </Button>
-                  </div>
-                </div>
-              ))}
+              {filteredProjects.map((project, index) => (
+  <div
+    key={project.name}
+    className="flex justify-between items-center border-b py-2 cursor-pointer hover:bg-gray-50"
+  >
+    <span
+      className="font-medium"
+      onClick={() => setActiveProject(project.name)}
+    >
+      {project.name}
+    </span>
+    <div className="flex items-center gap-2 relative">
+      <span className="text-sm text-gray-500">{project.date}</span>
+      <button
+        className="p-2 rounded-full hover:bg-gray-100"
+        onClick={(e) => {
+          e.stopPropagation(); // מונע את הפעלת setActiveProject
+          setOpenMenuIndex(index === openMenuIndex ? null : index); // פותח/סוגר את התפריט לפי אינדקס
+        }}
+      >
+        {/* אייקון של שלוש נקודות */}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5 text-gray-600"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path d="M10 3a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM10 10a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM10 17a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
+        </svg>
+      </button>
+      {openMenuIndex === index && (
+        <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+          <button
+            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            onClick={() => {
+              setOpenMenuIndex(null); // סגור את התפריט
+              editProject(project);
+            }}
+          >
+            ערוך
+          </button>
+          <button
+            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-100"
+            onClick={() => {
+              setOpenMenuIndex(null); // סגור את התפריט
+              deleteProject(project.name);
+            }}
+          >
+            מחק
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+))}
             </CardContent>
           </Card>
         )}
@@ -352,8 +379,21 @@ export default function ClientTrackerApp() {
 
   </div>
   <div className="flex flex-col gap-2">
-    <Button variant="outline" onClick={() => setActiveProject(null)}>חזרה לכל הפרויקטים</Button>
-    <Button variant="outline" onClick={() => editProject(currentProject)}>ערוך</Button>  </div>
+  <Button
+    variant="outline"
+    className="w-20 sm:w-32 md:w-40 lg:w-48 h-8 sm:h-10 md:h-12 lg:h-14 text-xs sm:text-sm md:text-base lg:text-lg flex items-center justify-center"
+    onClick={() => setActiveProject(null)}
+  >
+    חזרה
+  </Button>
+  <Button
+    variant="outline"
+    className="w-20 sm:w-32 md:w-40 lg:w-48 h-8 sm:h-10 md:h-12 lg:h-14 text-xs sm:text-sm md:text-base lg:text-lg flex items-center justify-center"
+    onClick={() => editProject(currentProject)}
+  >
+    ערוך
+  </Button>
+</div>
 </div>
               <div className="text-m text-gray-600 space-y-1">
                 <p>סכום כולל לפרויקט: ₪{currentProject.budget}</p>
@@ -382,21 +422,21 @@ export default function ClientTrackerApp() {
       ]}
     >
       <XAxis type="number" /> {/* ציר הערכים */}
-      <YAxis type="category" dataKey="" /> {/* ציר הקטגוריות */}
+      <YAxis type="category" dataKey="name" /> {/* ציר הקטגוריות */}
       <Tooltip />
       <Bar
         dataKey="expenses"
         stackId="a"
         fill="#ff4d4f" // צבע אדום להוצאות
         name="הוצאות"
-        label={{ position: "inside", formatter: (value) => `₪${value}` }}
+        label={{ position: "inside", fill: "#ffffff", formatter: (value) => `₪${value}` }}
       />
       <Bar
         dataKey="remaining"
         stackId="a"
         fill="#82ca9d" // צבע ירוק ליתרה
         name="יתרה"
-        label={{ position: "inside", formatter: (value) => `₪${value}` }}
+        label={{ position: "inside", fill: "#ffffff", formatter: (value) => `₪${value}` }}
       />
     </BarChart>
   </ResponsiveContainer>
@@ -433,8 +473,10 @@ export default function ClientTrackerApp() {
                   <div>{client.date}</div>
                   <div className="text-sm text-gray-600 col-span-1 md:col-span-1">{client.notes}</div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => editClient(client)}>ערוך</Button>
-                    <Button variant="destructive" size="sm" onClick={() => deleteClient(client.id)}>מחק</Button>
+                    <Button variant="outline" className="w-24 sm:w-32 md:w-40 lg:w-48 h-8 sm:h-10 md:h-12 lg:h-14 text-xs sm:text-sm md:text-base lg:text-lg flex items-center justify-center"
+ onClick={() => editClient(client)}>ערוך</Button>
+                    <Button variant="destructive"     className="w-24 sm:w-32 md:w-40 lg:w-48 h-8 sm:h-10 md:h-12 lg:h-14 text-xs sm:text-sm md:text-base lg:text-lg flex items-center justify-center"
+ onClick={() => deleteClient(client.id)}>מחק</Button>
                   </div>
                 </div>
               ))}
