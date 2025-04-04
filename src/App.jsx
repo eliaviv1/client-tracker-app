@@ -23,7 +23,7 @@ const db = getFirestore(app);
 export default function ClientTrackerApp() {
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [form, setForm] = useState({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "", isCash: false });
+  const [form, setForm] = useState({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "", isCash: false, });
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectBudget, setNewProjectBudget] = useState("");
   const [newProjectDescription, setNewProjectDescription] = useState("");
@@ -439,8 +439,13 @@ export default function ClientTrackerApp() {
               <div className="text-m text-gray-600 space-y-1">
               <p className="text-lg font-bold">  סכום כולל לפרויקט: ₪{currentProject.budget} ({currentProject.vatIncluded || "לא כולל מע\"מ"})</p> 
               <p>מע"מ (₪): ₪{calculateVAT(currentProject.budget, currentProject.vatIncluded)}</p>
-              <p>סה"כ הוצאות: ₪{clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)}</p>
-              <p className={`font-semibold ${parseFloat(currentProject.budget || 0) - clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+              <p>
+  סה"כ הוצאות: ₪
+  {(
+    clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) +
+    (currentProject?.vatIncluded === "כולל מע\"מ" ? parseFloat(calculateVAT(currentProject.budget, currentProject.vatIncluded)) : 0)
+  ).toFixed(2)}
+</p>              <p className={`font-semibold ${parseFloat(currentProject.budget || 0) - clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) < 0 ? 'text-red-600' : 'text-green-600'}`}>
                   יתרה: ₪{(parseFloat(currentProject.budget || 0) - clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0))} (
                   {(100 * clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) / parseFloat(currentProject.budget || 1)).toFixed(0)}% נוצל)
                 </p>
