@@ -40,12 +40,12 @@ export default function ClientTrackerApp() {
   const [nationalInsuranceRate, setNationalInsuranceRate] = useState("");
   const [incomeTaxRate, setIncomeTaxRate] = useState("");
   const [isVatIncluded, setIsVatIncluded] = useState("לא כולל מע\"מ");
-  const calculateVAT = (amount) => {
+  const calculateVAT = (amount, vatIncluded) => {
     if (!amount || isNaN(amount) || !vatRate || isNaN(vatRate)) {
       return 0; // אם אין סכום או מע"מ תקין, החזר 0
     }
   
-    if (isVatIncluded === "כולל מע\"מ") {
+    if (vatIncluded === "כולל מע\"מ") {
       // חישוב המע"מ מתוך הסכום הכולל
       const vatMultiplier = 1 + parseFloat(vatRate) / 100;
       return (parseFloat(amount) - parseFloat(amount) / vatMultiplier).toFixed(2);
@@ -293,17 +293,16 @@ export default function ClientTrackerApp() {
       <SelectItem value="לא כולל מע&quot;מ">לא כולל מע"מ</SelectItem>
     </SelectContent>
     </Select>
-              <div>
+    <div>
   <label className="block text-sm font-medium mb-1">מע"מ (₪)</label>
   <Input
     type="text"
-    value={newProjectBudget ? calculateVAT(newProjectBudget) : ""}
+    value={newProjectBudget ? calculateVAT(newProjectBudget, isVatIncluded) : ""}
     readOnly
     placeholder="מעמ יחושב אוטומטית"
     className="bg-gray-100 cursor-not-allowed"
   />
-</div>
-              <div>
+</div>              <div>
                 <label className="block text-sm font-medium mb-1">תאריך הפרויקט</label>
                 <Input 
                   value={newProjectDate} 
@@ -412,7 +411,9 @@ export default function ClientTrackerApp() {
             <CardContent className="pt-6 space-y-4">
               <div className="flex justify-between items-center">
   <div>
-    <h2 className="text-xl font-semibold">שם הפרויקט: {activeProject}</h2>
+    <h2 className="text-xl font-bold">שם הפרויקט: {activeProject}</h2>
+    <h2 className="text-xl font-semibold"> {currentProject.date}</h2> 
+
     {currentProject?.client && <p className="text-m text-gray-500 mt-1">לקוח: {currentProject.client}</p>}
     {currentProject?.type && <p className="text-l text-gray-800 mt-1">סוג הפרויקט: {currentProject.type}</p>}
 
@@ -436,12 +437,42 @@ export default function ClientTrackerApp() {
 </div>
 </div>
               <div className="text-m text-gray-600 space-y-1">
-                <p>סכום כולל לפרויקט: ₪{currentProject.budget}</p>
-                <p>סה"כ הוצאות: ₪{clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)}</p>
-                <p className={`font-semibold ${parseFloat(currentProject.budget || 0) - clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+              <p className="text-lg font-bold">  סכום כולל לפרויקט: ₪{currentProject.budget} ({currentProject.vatIncluded || "לא כולל מע\"מ"})</p> 
+              <p>מע"מ (₪): ₪{calculateVAT(currentProject.budget, currentProject.vatIncluded)}</p>
+              <p>סה"כ הוצאות: ₪{clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)}</p>
+              <p className={`font-semibold ${parseFloat(currentProject.budget || 0) - clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) < 0 ? 'text-red-600' : 'text-green-600'}`}>
                   יתרה: ₪{(parseFloat(currentProject.budget || 0) - clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0))} (
                   {(100 * clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) / parseFloat(currentProject.budget || 1)).toFixed(0)}% נוצל)
                 </p>
+                <p className="text-sm text-gray-500">
+    יתרה לאחר מיסים: ₪
+    {calculateNetAmount(
+      parseFloat(currentProject.budget || 0) -
+        clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)
+    )}
+  </p>
+  <p className="text-sm text-gray-500">
+    הופרש לביטוח לאומי: ₪
+    {(
+      (parseFloat(currentProject.budget || 0) -
+        clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)) *
+      parseFloat(nationalInsuranceRate || 0) /
+      100
+    ).toFixed(2)}
+  </p>
+  <p className="text-sm text-gray-500">
+    הופרש למס הכנסה: ₪
+    {(
+      ((parseFloat(currentProject.budget || 0) -
+        clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)) -
+        (parseFloat(currentProject.budget || 0) -
+          clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)) *
+          parseFloat(nationalInsuranceRate || 0) /
+          100) *
+      parseFloat(incomeTaxRate || 0) /
+      100
+    ).toFixed(2)}
+  </p>
               </div>
 {/* גרף הוצאות מתוך ההכנסות */}
 <div className="flex flex-col">
