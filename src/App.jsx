@@ -497,8 +497,8 @@ const deleteClient = async (id) => {
         },
       ]}
     >
-      <XAxis type="number" /> {/* ציר הערכים */}
-      <YAxis type="category" dataKey="name" /> {/* ציר הקטגוריות */}
+      <XAxis type="number" hide /> {/* ציר הערכים */}
+      <YAxis type="category" hide dataKey="name" /> {/* ציר הקטגוריות */}
       <Tooltip />
       <Bar
         dataKey="expenses"
