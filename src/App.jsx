@@ -93,26 +93,30 @@ export default function ClientTrackerApp() {
 
   const addClientToProject = async () => {
     if ((!form.clientId && !form.clientName) || !form.amount || !activeProject) return;
+  
     const name = form.clientId
       ? clients.find((c) => c.id === form.clientId)?.name || ""
       : form.clientName;
+  
     const clientData = {
       ...form,
-      id: editingId || Date.now(),
       project: activeProject,
-      name
+      name,
     };
+  
     if (editingId) {
-      await updateDoc(doc(db, "clients", editingId.toString()), clientData);
-      setClients(clients.map((c) => (c.id === editingId ? clientData : c)));
+      // עדכון מסמך קיים
+      await updateDoc(doc(db, "clients", editingId), clientData);
+      setClients(clients.map((c) => (c.id === editingId ? { ...clientData, id: editingId } : c)));
       setEditingId(null);
     } else {
+      // הוספת מסמך חדש
       const docRef = await addDoc(collection(db, "clients"), clientData);
-      setClients([...clients, { ...clientData, id: docRef.id }]);
+      setClients([...clients, { ...clientData, id: docRef.id }]); // שמירת ה-ID שנוצר על ידי Firestore
     }
+  
     setForm({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "", isCash: false });
   };
-
   const editClient = (client) => {
     setForm({
       clientId: client.clientId || "",
@@ -121,35 +125,26 @@ export default function ClientTrackerApp() {
       status: client.status,
       notes: client.notes,
       date: client.date || "",
-      isCash: client.isCash || false
+      isCash: client.isCash || false,
     });
-    setEditingId(client.id);
+    setEditingId(client.id); // שמירת ה-ID של המסמך לעריכה
   };
 
-  const deleteClient = async (id) => {
-    try {
-      console.log("Attempting to delete client with ID:", id); // הדפסת ה-ID לקונסול
-
-      // מחיקת המסמך מהבסיס נתונים
-      const clientRef = doc(db, "clients", id.toString());
-      await deleteDoc(clientRef);
-  
-      // עדכון הלקוחות ב-state המקומי
-      setClients(clients.filter((c) => c.id !== id));
-  
-      // איפוס מצב העריכה אם הלקוח שנמחק היה בעריכה
-      if (editingId === id) {
-        setEditingId(null);
-        setForm({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "", isCash: false });
-      }
-  
-      alert("ההוצאה נמחקה בהצלחה!");
-    } catch (error) {
-      console.error("Error deleting client:", error.message);
-      alert("אירעה שגיאה בעת מחיקת ההוצאה. נסה שוב.");
+const deleteClient = async (id) => {
+  try {
+    const clientRef = doc(db, "clients", id);
+    await deleteDoc(clientRef);
+    setClients(clients.filter((c) => c.id !== id));
+    if (editingId === id) {
+      setEditingId(null);
+      setForm({ clientId: "", clientName: "", amount: "", status: "", notes: "", date: "", isCash: false });
     }
-  };
-
+    alert("ההוצאה נמחקה בהצלחה!");
+  } catch (error) {
+    console.error("Error deleting client:", error.message);
+    alert("אירעה שגיאה בעת מחיקת ההוצאה. נסה שוב.");
+  }
+};
   const addProject = async () => {
     if (!newProjectName.trim()) return;
 
@@ -445,10 +440,16 @@ export default function ClientTrackerApp() {
     clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) +
     (currentProject?.vatIncluded === "כולל מע\"מ" ? parseFloat(calculateVAT(currentProject.budget, currentProject.vatIncluded)) : 0)
   ).toFixed(2)}
-</p>              <p className={`font-semibold ${parseFloat(currentProject.budget || 0) - clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  יתרה: ₪{(parseFloat(currentProject.budget || 0) - clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0))} (
-                  {(100 * clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) / parseFloat(currentProject.budget || 1)).toFixed(0)}% נוצל)
-                </p>
+</p>             
+<p className={`font-semibold ${parseFloat(currentProject.budget || 0) - clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+  יתרה: ₪
+  {(
+     parseFloat(currentProject.budget || 0) -
+     clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) -
+     (currentProject.vatIncluded === "כולל מע\"מ" ? parseFloat(calculateVAT(currentProject.budget, currentProject.vatIncluded)) : 0)
+  ).toFixed(2)} (
+  {(100 * clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) / parseFloat(currentProject.budget || 1)).toFixed(0)}% נוצל)
+</p>
                 <p className="text-sm text-gray-500">
     יתרה לאחר מיסים: ₪
     {calculateNetAmount(
@@ -457,7 +458,7 @@ export default function ClientTrackerApp() {
     )}
   </p>
   <p className="text-sm text-gray-500">
-    הופרש לביטוח לאומי: ₪
+    יופרש לביטוח לאומי: ₪
     {(
       (parseFloat(currentProject.budget || 0) -
         clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)) *
@@ -466,7 +467,7 @@ export default function ClientTrackerApp() {
     ).toFixed(2)}
   </p>
   <p className="text-sm text-gray-500">
-    הופרש למס הכנסה: ₪
+    יופרש למס הכנסה: ₪
     {(
       ((parseFloat(currentProject.budget || 0) -
         clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)) -
@@ -486,14 +487,13 @@ export default function ClientTrackerApp() {
           layout="vertical" // שינוי הפריסה לאופקית
       data={[
         {
-          name: currentProject.name,
-          income: parseFloat(currentProject.budget || 0),
-          expenses: clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0),
+          income: parseFloat(currentProject.budget, currentProject.vatIncluded || 0),
+          expenses: clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) +
+          (currentProject?.vatIncluded === "כולל מע\"מ" ? parseFloat(calculateVAT(currentProject.budget, currentProject.vatIncluded)) : 0),
           remaining: Math.max(
             parseFloat(currentProject.budget || 0) -
-              clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0),
-            0
-          ), // יתרה
+     clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0) -
+     (currentProject.vatIncluded === "כולל מע\"מ" ? parseFloat(calculateVAT(currentProject.budget, currentProject.vatIncluded)) : 0) ), // יתרה
         },
       ]}
     >
