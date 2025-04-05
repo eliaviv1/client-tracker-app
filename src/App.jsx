@@ -587,6 +587,14 @@ const deleteClient = async (id) => {
     מזומן
   </label>
 </div>
+{/* סך הכל הוצאות ממתינות לתשלום */}
+<div className="text-lg font-semibold text-gray-700">
+  סך הכל הוצאות ממתינות לתשלום: ₪
+  {clientsInProject
+    .filter((client) => client.status === "ממתין לתשלום")
+    .reduce((acc, client) => acc + parseFloat(client.amount || 0), 0)
+    .toFixed(2)}
+</div>
               </div>
               <Button onClick={addClientToProject}>{editingId ? "שמור שינויים" : "הוסף הוצאה לפרויקט"}</Button>
               {clientsInProject.map((client) => (
