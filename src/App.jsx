@@ -519,15 +519,46 @@ const deleteClient = async (id) => {
 </div>             
  {/* טופס הוספת הוצאות */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Select value={form.clientId} onValueChange={(val) => setForm({ ...form, clientId: val, clientName: "" })}>
-                  <SelectTrigger>{form.clientId ? clients.find(c => c.id === form.clientId)?.name : "בחר הוצאה קיימת"}</SelectTrigger>
-                  <SelectContent>
-                    {availableClients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input name="clientName" value={form.clientName} onChange={e => setForm({ ...form, clientName: e.target.value, clientId: "" })} placeholder="או צור הוצאה חדשה" />
+              <div className="relative">
+  <Input
+    value={form.clientName}
+    onChange={(e) => {
+      const value = e.target.value;
+      setForm({ ...form, clientName: value, clientId: "" }); // עדכון שם ההוצאה והאיפוס של clientId
+      setSearch(value); // עדכון החיפוש
+    }}
+    placeholder="חפש הוצאה לפי שם..."
+  />
+  {search && (
+    <div className="absolute z-10 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto w-full">
+      {clients
+        .filter((client) => client.name.toLowerCase().includes(search.toLowerCase()))
+        .map((client) => (
+          <div
+            key={client.id}
+            className="p-2 hover:bg-gray-100 cursor-pointer"
+            onClick={() => {
+              setForm({
+                clientId: client.id,
+                clientName: client.name,
+                amount: client.amount,
+                status: client.status,
+                notes: client.notes,
+                date: client.date,
+                isCash: client.isCash,
+              });
+              setSearch(""); // איפוס החיפוש לאחר בחירה
+            }}
+          >
+            {client.name}
+          </div>
+        ))}
+      {clients.filter((client) => client.name.toLowerCase().includes(search.toLowerCase())).length === 0 && (
+        <div className="p-2 text-gray-500">לא נמצאו תוצאות</div>
+      )}
+    </div>
+  )}
+</div>                <Input name="clientName" value={form.clientName} onChange={e => setForm({ ...form, clientName: e.target.value, clientId: "" })} placeholder="או צור הוצאה חדשה" />
                 <Input name="amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="סכום בפרויקט" type="number" />
                 <Select value={form.status} onValueChange={(val) => setForm({ ...form, status: val })}>
                   <SelectTrigger>{form.status || "בחר סטטוס"}</SelectTrigger>
