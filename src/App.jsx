@@ -453,32 +453,36 @@ const deleteClient = async (id) => {
                 <p className="text-sm text-gray-500">
     יתרה לאחר מיסים: ₪
     {calculateNetAmount(
-      parseFloat(currentProject.budget || 0) -
+    currentProject.vatIncluded === "כולל מע\"מ"
+      ? parseFloat(currentProject.budget || 0) / (1 + parseFloat(vatRate || 0) / 100) -
         clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)
-    )}
-  </p>
-  <p className="text-sm text-gray-500">
-    יופרש לביטוח לאומי: ₪
-    {(
-      (parseFloat(currentProject.budget || 0) -
-        clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)) *
-      parseFloat(nationalInsuranceRate || 0) /
-      100
-    ).toFixed(2)}
-  </p>
-  <p className="text-sm text-gray-500">
-    יופרש למס הכנסה: ₪
-    {(
-      ((parseFloat(currentProject.budget || 0) -
-        clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)) -
-        (parseFloat(currentProject.budget || 0) -
-          clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)) *
-          parseFloat(nationalInsuranceRate || 0) /
-          100) *
-      parseFloat(incomeTaxRate || 0) /
-      100
-    ).toFixed(2)}
-  </p>
+      : parseFloat(currentProject.budget || 0) -
+        clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0)
+  )} 
+ </p>
+ <p className="text-sm text-gray-500">
+  יופרש לביטוח לאומי: ₪
+  {(
+    (currentProject.vatIncluded === "כולל מע\"מ"
+      ? (parseFloat(currentProject.budget || 0) / (1 + parseFloat(vatRate || 0) / 100) -
+          clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0))
+      : (parseFloat(currentProject.budget || 0) -
+          clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0))) *
+    (parseFloat(nationalInsuranceRate || 0) / 100)
+  ).toFixed(2)}
+</p>
+<p className="text-sm text-gray-500">
+  יופרש למס הכנסה: ₪
+  {(
+    (currentProject.vatIncluded === "כולל מע\"מ"
+      ? (parseFloat(currentProject.budget || 0) / (1 + parseFloat(vatRate || 0) / 100) -
+          clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0))
+      : (parseFloat(currentProject.budget || 0) -
+          clientsInProject.reduce((acc, c) => acc + parseFloat(c.amount || 0), 0))) *
+    (1 - parseFloat(nationalInsuranceRate || 0) / 100) * // חישוב לאחר ניכוי ביטוח לאומי
+    (parseFloat(incomeTaxRate || 0) / 100)
+  ).toFixed(2)}
+</p>
               </div>
 {/* גרף הוצאות מתוך ההכנסות */}
 <div className="flex flex-col">
@@ -499,20 +503,22 @@ const deleteClient = async (id) => {
     >
       <XAxis type="number" hide /> {/* ציר הערכים */}
       <YAxis type="category" hide dataKey="name" /> {/* ציר הקטגוריות */}
-      <Tooltip />
+      <Tooltip formatter={(value) => `₪${parseFloat(value).toFixed(2)}`} // עיגול לשתי ספרות אחרי הנקודה
+/>
       <Bar
         dataKey="expenses"
         stackId="a"
         fill="#ff4d4f" // צבע אדום להוצאות
         name="הוצאות"
-        label={{ position: "inside", fill: "#ffffff", formatter: (value) => `₪${value}` }}
+        label={{ position: "inside", fill: "#ffffff", formatter: (value) => `₪${value.toFixed(2)}` 
+        }}
       />
       <Bar
         dataKey="remaining"
         stackId="a"
         fill="#82ca9d" // צבע ירוק ליתרה
         name="יתרה"
-        label={{ position: "inside", fill: "#ffffff", formatter: (value) => `₪${value}` }}
+        label={{ position: "inside", fill: "#ffffff", formatter: (value) => `₪${value.toFixed(2)}` }}
       />
     </BarChart>
   </ResponsiveContainer>
